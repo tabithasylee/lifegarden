@@ -1,0 +1,38 @@
+# ── Environment & secrets ──────────────────────────────────────────────────────
+.env
+.env.local
+.env.*.local
+.env.production
+app/.env.local
+app/.env.*.local
+
+# ── Claude / AI tooling ────────────────────────────────────────────────────────
+CLAUDE.md
+.claude/
+
+# ── Dependencies ───────────────────────────────────────────────────────────────
+node_modules/
+app/node_modules/
+
+# ── Build output ───────────────────────────────────────────────────────────────
+app/dist/
+app/.vercel/
+
+# ── Large reference files ──────────────────────────────────────────────────────
+*.mp4
+*.mov
+*.avi
+
+# ── OS files ───────────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ── Editor ─────────────────────────────────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
+
+.vercel
+.env*.local

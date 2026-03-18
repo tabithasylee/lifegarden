@@ -1,0 +1,130 @@
+@import url('https://fonts.googleapis.com/css2?family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;0,9..144,500;0,9..144,700;1,9..144,300;1,9..144,400&display=swap');
+
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+@custom-variant dark (&:is(.dark *));
+
+/* Design system tokens */
+@theme {
+  --color-bg:       #112f2c;
+  --color-sidebar:  #0c2420;
+  --color-surface:  #183832;
+  --color-card:     #1e3a35;
+  --color-cream:    #fbe6a0;
+  --color-sage:     #7B9E8B;
+  --color-amber:    #e2b540;
+  --color-red:      #da525d;
+  --color-green:    #44CF6C;
+
+  --font-mono:  'Space Mono', monospace;
+  --font-serif: 'Fraunces', serif;
+}
+
+/* Override shadcn tokens to match our palette */
+@theme inline {
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --color-background:              var(--background);
+  --color-foreground:              var(--foreground);
+  --color-card:                    var(--card);
+  --color-card-foreground:         var(--card-foreground);
+  --color-popover:                 var(--popover);
+  --color-popover-foreground:      var(--popover-foreground);
+  --color-primary:                 var(--primary);
+  --color-primary-foreground:      var(--primary-foreground);
+  --color-secondary:               var(--secondary);
+  --color-secondary-foreground:    var(--secondary-foreground);
+  --color-muted:                   var(--muted);
+  --color-muted-foreground:        var(--muted-foreground);
+  --color-accent:                  var(--accent);
+  --color-accent-foreground:       var(--accent-foreground);
+  --color-destructive:             var(--destructive);
+  --color-border:                  var(--border);
+  --color-input:                   var(--input);
+  --color-ring:                    var(--ring);
+}
+
+:root {
+  --radius: 0.25rem;
+
+  --background:        #112f2c;
+  --foreground:        #fbe6a0;
+  --card:              #1e3a35;
+  --card-foreground:   #fbe6a0;
+  --popover:           #0c2420;
+  --popover-foreground:#fbe6a0;
+  --primary:           #e2b540;
+  --primary-foreground:#112f2c;
+  --secondary:         #183832;
+  --secondary-foreground: #fbe6a0;
+  --muted:             #183832;
+  --muted-foreground:  #7B9E8B;
+  --accent:            #183832;
+  --accent-foreground: #fbe6a0;
+  --destructive:       #da525d;
+  --border:            rgba(251,230,160,0.12);
+  --input:             rgba(251,230,160,0.08);
+  --ring:              #e2b540;
+}
+
+@layer base {
+  * {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+    @apply border-border;
+  }
+}
+
+html, body, #root {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background-color: #112f2c;
+  color: #fbe6a0;
+  font-family: 'Space Mono', monospace;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ── Scrollbars ───────────────────────────────────────────────────────────── */
+::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+::-webkit-scrollbar-track {
+  background: rgba(226, 181, 64, 0.06);
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(226, 181, 64, 0.28);
+  border-radius: 2px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(226, 181, 64, 0.45);
+}
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(226, 181, 64, 0.28) rgba(226, 181, 64, 0.06);
+}
+
+/* ── Checkbox animations ──────────────────────────────────────────────────── */
+@keyframes checkBounce {
+  0%   { transform: scale(1); }
+  35%  { transform: scale(1.18); }
+  65%  { transform: scale(0.9); }
+  100% { transform: scale(1); }
+}
+
+/* ── Cursor sprout animations ─────────────────────────────────────────────── */
+@keyframes sproutStem {
+  from { transform: scaleY(0); }
+  to   { transform: scaleY(1); }
+}
+
+@keyframes sproutLeaf {
+  from { opacity: 0; transform: scale(0); }
+  to   { opacity: 1; transform: scale(1); }
+}
