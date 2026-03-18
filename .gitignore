@@ -36,3 +36,4 @@ desktop.ini
 
 .vercel
 .env*.local
+vercel.json
