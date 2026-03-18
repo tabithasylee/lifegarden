@@ -202,14 +202,23 @@ export default function GardenCanvas() {
     // ── Biome contours — smooth pulsing rings with dynamic tree-position pull ──
     const N_CONTOUR_RINGS = 5
     const N_CONTOUR_VERTS = 128
-    const CONTOUR_MAX_PULL      = 90
+    const CONTOUR_MAX_PULL      = 220
     const CONTOUR_THETA_SIGMA   = 0.85   // angular spread (radians, ~49°)
-    const CONTOUR_RADIAL_SIGMA  = 0.55   // radial weight spread (normalized ellipse units)
+    const CONTOUR_RADIAL_SIGMA  = 0.55   // radial weight spread (normalized ellipse units, for interior trees)
     const CONTOUR_ANIM_DURATION = 1.2   // seconds for bulge to bloom in
+    const CENTROID_BLEND        = 0.55   // how far (0–1) the ring center drifts toward the tree centroid
+
+    function computeCentroid(treePositions: { wx: number; wy: number }[]): { wx: number; wy: number } {
+      if (treePositions.length === 0) return { wx: 0, wy: 0 }
+      const sumWx = treePositions.reduce((s, t) => s + t.wx, 0)
+      const sumWy = treePositions.reduce((s, t) => s + t.wy, 0)
+      return { wx: sumWx / treePositions.length, wy: sumWy / treePositions.length }
+    }
     interface ContourRing { loop: THREE.LineLoop; mat: THREE.LineBasicMaterial; phase: number }
     interface BiomeContourEntry {
       geo: THREE.BufferGeometry; rings: ContourRing[]; biomeId: string
       prevVerts: number[]; targetVerts: number[]; animProgress: number
+      prevCenter: { x: number; z: number }; targetCenter: { x: number; z: number }
     }
     const biomeContours = new Map<string, BiomeContourEntry>()
 
@@ -288,7 +297,12 @@ export default function GardenCanvas() {
           if (dTheta >  Math.PI) dTheta -= Math.PI * 2
           if (dTheta < -Math.PI) dTheta += Math.PI * 2
           const angWeight = Math.exp(-(dTheta * dTheta) / (2 * CONTOUR_THETA_SIGMA  * CONTOUR_THETA_SIGMA))
-          const radWeight = Math.exp(-((td.r - 1) * (td.r - 1)) / (2 * CONTOUR_RADIAL_SIGMA * CONTOUR_RADIAL_SIGMA))
+          // Outlier trees (r > 1, outside the ellipse) pull harder the further out they are.
+          // Interior trees taper off so they don't over-inflate the boundary.
+          const dist = td.r - 1
+          const radWeight = dist > 0
+            ? 1 + dist * 2.5
+            : Math.exp(-(dist * dist) / (2 * CONTOUR_RADIAL_SIGMA * CONTOUR_RADIAL_SIGMA))
           pull += angWeight * radWeight * CONTOUR_MAX_PULL
         }
         pull = Math.min(pull, CONTOUR_MAX_PULL)
@@ -304,7 +318,11 @@ export default function GardenCanvas() {
       const seed   = biomeIndex * 91.7
 
       const treePositions = computeTreePositionsForBiome(biome.id, store)
-      const verts = buildContourVerts(layout, treePositions, seed)
+      const centroid = computeCentroid(treePositions)
+      const adjCx = layout.cx + centroid.wx * CENTROID_BLEND
+      const adjCy = layout.cy + centroid.wy * CENTROID_BLEND
+      const adjPositions = treePositions.map(t => ({ wx: t.wx - centroid.wx * CENTROID_BLEND, wy: t.wy - centroid.wy * CENTROID_BLEND }))
+      const verts = buildContourVerts(layout, adjPositions, seed)
       const geo = new THREE.BufferGeometry()
       geo.setAttribute('position', new THREE.Float32BufferAttribute(verts, 3))
 
@@ -312,12 +330,12 @@ export default function GardenCanvas() {
       for (let ri = 0; ri < N_CONTOUR_RINGS; ri++) {
         const mat  = new THREE.LineBasicMaterial({ color, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false })
         const loop = new THREE.LineLoop(geo, mat)
-        loop.position.set(layout.cx, 0, layout.cy)
+        loop.position.set(adjCx, 0, adjCy)
         loop.rotation.y = -Math.PI / 4
         scene.add(loop)
         rings.push({ loop, mat, phase: ri / N_CONTOUR_RINGS })
       }
-      biomeContours.set(biome.id, { geo, rings, biomeId: biome.id, prevVerts: [...verts], targetVerts: [...verts], animProgress: -1 })
+      biomeContours.set(biome.id, { geo, rings, biomeId: biome.id, prevVerts: [...verts], targetVerts: [...verts], animProgress: -1, prevCenter: { x: adjCx, z: adjCy }, targetCenter: { x: adjCx, z: adjCy } })
     })
 
     function rebuildContourGeo(biomeId: string, snap: ReturnType<typeof useGardenStore.getState>) {
@@ -329,10 +347,16 @@ export default function GardenCanvas() {
       const layout = getBiomeLayout(biome, biomeIndex, snap.biomeLayouts)
       const seed   = biomeIndex * 91.7
       const treePositions = computeTreePositionsForBiome(biomeId, snap)
-      const verts = buildContourVerts(layout, treePositions, seed)
+      const centroid = computeCentroid(treePositions)
+      const adjCx = layout.cx + centroid.wx * CENTROID_BLEND
+      const adjCy = layout.cy + centroid.wy * CENTROID_BLEND
+      const adjPositions = treePositions.map(t => ({ wx: t.wx - centroid.wx * CENTROID_BLEND, wy: t.wy - centroid.wy * CENTROID_BLEND }))
+      const verts = buildContourVerts(layout, adjPositions, seed)
       const arr = entry.geo.attributes.position.array as Float32Array
       entry.prevVerts = Array.from(arr)
       entry.targetVerts = verts
+      entry.prevCenter = { x: entry.rings[0].loop.position.x, z: entry.rings[0].loop.position.z }
+      entry.targetCenter = { x: adjCx, z: adjCy }
       entry.animProgress = 0
     }
 
@@ -586,6 +610,7 @@ export default function GardenCanvas() {
         const { tm } = editDrag
         editDrag = null
         el.style.cursor = 'crosshair'
+        registerTreePosition(tm.treeId, tm.wx, tm.wy)
         const s = useGardenStore.getState()
         s.setTreeLayout(tm.treeId, tm.wx, tm.wy)
         // Re-read after setTreeLayout so treeLayouts reflects new position
@@ -721,6 +746,9 @@ export default function GardenCanvas() {
             arr[i] = entry.prevVerts[i] + (entry.targetVerts[i] - entry.prevVerts[i]) * p
           }
           entry.geo.attributes.position.needsUpdate = true
+          const cx = entry.prevCenter.x + (entry.targetCenter.x - entry.prevCenter.x) * p
+          const cz = entry.prevCenter.z + (entry.targetCenter.z - entry.prevCenter.z) * p
+          entry.rings.forEach(r => r.loop.position.set(cx, 0, cz))
           if (entry.animProgress >= 1) entry.animProgress = -1
         }
 
