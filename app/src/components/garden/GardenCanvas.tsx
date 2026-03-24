@@ -131,6 +131,7 @@ export default function GardenCanvas() {
     }
     const LEAF_TEX_LIST = [LEAF_TEXTURES.dot, LEAF_TEXTURES.ring]
 
+
     const store = useGardenStore.getState()
 
     let zoom = 1.0
@@ -363,9 +364,23 @@ export default function GardenCanvas() {
     // ── Trees ──
     function easeOutCubic(x: number) { return 1 - Math.pow(1 - x, 3) }
 
+    // scale: completion ratio drives overall size (segment length)
+    // density: task count drives branching complexity (steps + lateral depth)
+    function treeGrowth(tasks: Tree['tasks']) {
+      const total = tasks.length
+      const done  = tasks.filter(t => t.status === 'complete').length
+      const ratio = total === 0 ? 0 : done / total
+      const density = total === 0 ? 0 : Math.min(1, Math.log1p(total) / Math.log1p(8))
+      const scale = total === 0 ? 0.25 : 0.25 + density * 0.4 + ratio * 0.35
+      return { scale, density }
+    }
+
     interface TreeMesh {
       group: THREE.Group; pulseRing: THREE.LineLoop; pulseRingMat: THREE.LineBasicMaterial
-      wx: number; wy: number; treeId: string
+      lineMat: THREE.LineBasicMaterial; pointsMat: THREE.PointsMaterial
+      linesMesh: THREE.LineSegments; pointsMesh: THREE.Points
+      nowRing: THREE.LineLoop; nowRingMat: THREE.LineBasicMaterial
+      wx: number; wy: number; treeId: string; treeWeek: string
       swaySpeed: number; swayAmp: number; swayOffset: number
       hovered: boolean; pulsePhase: number
       spawnDelay: number; spawnDuration: number; spawnDone: boolean
@@ -399,11 +414,9 @@ export default function GardenCanvas() {
       const finalWx = manualPos ? manualPos.wx : wx
       const finalWy = manualPos ? manualPos.wy : wy
 
-      const done  = tree.tasks.filter(t => t.status === 'complete').length
-      const total = tree.tasks.length
-      const growthScale = total === 0 ? 0.3 : 0.5 + (done / Math.max(total, 1)) * 0.7
+      const { scale: growthScale, density } = treeGrowth(tree.tasks)
 
-      const { lineVerts, tips } = buildTreeGeometry(tree.projectId, growthScale)
+      const { lineVerts, tips } = buildTreeGeometry(tree.projectId, growthScale, density)
 
       const isCurrentWeek = tree.week === snap.currentWeek
       const wkDist = weekDistance(tree.week, snap.currentWeek)
@@ -411,9 +424,10 @@ export default function GardenCanvas() {
 
       const lineGeo = new THREE.BufferGeometry()
       lineGeo.setAttribute('position', new THREE.Float32BufferAttribute(lineVerts, 3))
-      const lines = new THREE.LineSegments(lineGeo, new THREE.LineBasicMaterial({
+      const lineMat = new THREE.LineBasicMaterial({
         color: new THREE.Color(0.72, 0.68, 0.55), transparent: true, opacity,
-      }))
+      })
+      const lines = new THREE.LineSegments(lineGeo, lineMat)
 
       const colorPair = getBiomeColorPair(biome, biomeIndex)
       const pPos: number[] = [], pCol: number[] = []
@@ -424,11 +438,12 @@ export default function GardenCanvas() {
       const ptGeo = new THREE.BufferGeometry()
       ptGeo.setAttribute('position', new THREE.Float32BufferAttribute(pPos, 3))
       ptGeo.setAttribute('color',    new THREE.Float32BufferAttribute(pCol, 3))
-      const points = new THREE.Points(ptGeo, new THREE.PointsMaterial({
+      const pointsMat = new THREE.PointsMaterial({
         size: 8, vertexColors: true, transparent: true, opacity,
         map: LEAF_TEX_LIST[tree.id.charCodeAt(0) % LEAF_TEX_LIST.length],
         blending: THREE.NormalBlending, depthWrite: false, sizeAttenuation: true,
-      }))
+      })
+      const points = new THREE.Points(ptGeo, pointsMat)
 
       const ringPts: number[] = []
       const N_RING = 64
@@ -444,6 +459,21 @@ export default function GardenCanvas() {
       const pulseRing = new THREE.LineLoop(ringGeo, ringMat)
       pulseRing.scale.set(0, 0, 0)
 
+      // Thin amber ring for current-week indicator — lies flat in world space
+      const nowRingPts: number[] = []
+      for (let i = 0; i <= 64; i++) {
+        const a = (i / 64) * Math.PI * 2
+        nowRingPts.push(Math.cos(a) * 6, 0, Math.sin(a) * 6)
+      }
+      const nowRingGeo = new THREE.BufferGeometry()
+      nowRingGeo.setAttribute('position', new THREE.Float32BufferAttribute(nowRingPts, 3))
+      const nowRingMat = new THREE.LineBasicMaterial({
+        color: new THREE.Color(biome.color), transparent: true, opacity: 0,
+      })
+      const nowRing = new THREE.LineLoop(nowRingGeo, nowRingMat)
+      nowRing.position.set(finalWx, 0, finalWy)
+      scene.add(nowRing)
+
       const group = new THREE.Group()
       group.add(lines, points, pulseRing)
       group.position.set(finalWx, 0, finalWy)
@@ -454,7 +484,9 @@ export default function GardenCanvas() {
       // Newly added trees after initial load spawn immediately (no stagger delay)
       group.scale.set(0, 0, 0)
       treeMeshes.push({
-        group, pulseRing, pulseRingMat: ringMat, wx: finalWx, wy: finalWy, treeId: tree.id,
+        group, pulseRing, pulseRingMat: ringMat, lineMat, pointsMat,
+        linesMesh: lines, pointsMesh: points, nowRing, nowRingMat,
+        wx: finalWx, wy: finalWy, treeId: tree.id, treeWeek: tree.week,
         swaySpeed:  0.22 + Math.random() * 0.33,
         swayAmp:    0.005 + Math.random() * 0.008,
         swayOffset: Math.random() * Math.PI * 2,
@@ -464,6 +496,36 @@ export default function GardenCanvas() {
         spawnDone: false,
         targetScale: growthScale * 3,
       })
+    }
+
+    function rebuildTreeGeo(tm: TreeMesh, tree: Tree, state: ReturnType<typeof useGardenStore.getState>) {
+      const project = state.projects.find(p => p.id === tree.projectId)
+      if (!project) return
+      const biome = state.biomes.find(b => b.id === project.biomeId)
+      if (!biome) return
+      const biomeIndex = state.biomes.indexOf(biome)
+
+      const { scale, density } = treeGrowth(tree.tasks)
+      const { lineVerts, tips } = buildTreeGeometry(tree.projectId, scale, density)
+
+      tm.linesMesh.geometry.dispose()
+      const lineGeo = new THREE.BufferGeometry()
+      lineGeo.setAttribute('position', new THREE.Float32BufferAttribute(lineVerts, 3))
+      tm.linesMesh.geometry = lineGeo
+
+      tm.pointsMesh.geometry.dispose()
+      const colorPair = getBiomeColorPair(biome, biomeIndex)
+      const pPos: number[] = [], pCol: number[] = []
+      tips.forEach((v, i) => {
+        pPos.push(v.x, v.y, v.z)
+        const c = colorPair[i % 2]; pCol.push(c.r, c.g, c.b)
+      })
+      const ptGeo = new THREE.BufferGeometry()
+      ptGeo.setAttribute('position', new THREE.Float32BufferAttribute(pPos, 3))
+      ptGeo.setAttribute('color',    new THREE.Float32BufferAttribute(pCol, 3))
+      tm.pointsMesh.geometry = ptGeo
+
+      tm.targetScale = scale * 3
     }
 
     store.trees.forEach((tree: Tree) => buildTreeMesh(tree, store))
@@ -481,16 +543,13 @@ export default function GardenCanvas() {
         if (!existingIds.has(tree.id)) buildTreeMesh(tree, state, true)
       })
 
-      // Update targetScale when a tree's tasks change (e.g. task completed)
+      // Rebuild geometry when a tree's tasks change (completion or count)
       state.trees.forEach(tree => {
         const mesh = treeMeshes.find(tm => tm.treeId === tree.id)
         if (!mesh) return
         const prevTree = prev.trees.find(t => t.id === tree.id)
         if (!prevTree || prevTree.tasks === tree.tasks) return
-        const done = tree.tasks.filter(t => t.status === 'complete').length
-        const total = tree.tasks.length
-        const gs = total === 0 ? 0.3 : 0.5 + (done / Math.max(total, 1)) * 0.7
-        mesh.targetScale = gs * 3
+        rebuildTreeGeo(mesh, tree, state)
       })
 
       // Remove meshes for trees that are gone (includes old temp-ID entries
@@ -498,6 +557,7 @@ export default function GardenCanvas() {
       for (let i = treeMeshes.length - 1; i >= 0; i--) {
         if (!newIds.has(treeMeshes[i].treeId)) {
           scene.remove(treeMeshes[i].group)
+          scene.remove(treeMeshes[i].nowRing)
           treeMeshes.splice(i, 1)
         }
       }
@@ -564,6 +624,8 @@ export default function GardenCanvas() {
         editDrag.tm.wx = newWx
         editDrag.tm.wy = newWy
         editDrag.tm.group.position.set(newWx, 0, newWy)
+        editDrag.tm.nowRing.position.set(newWx, 0, newWy)
+        registerTreePosition(editDrag.tm.treeId, newWx, newWy)
         return
       }
 
@@ -779,6 +841,17 @@ export default function GardenCanvas() {
             tm.group.scale.set(s, s, s)
           }
         }
+
+        // Dynamic opacity: fades with age relative to current week
+        const currentWeek = useGardenStore.getState().currentWeek
+        const dist = weekDistance(tm.treeWeek, currentWeek)
+        const targetOpacity = tm.treeWeek === currentWeek ? 1.0 : Math.max(0.12, 0.55 - dist * 0.15)
+        if (Math.abs(tm.lineMat.opacity - targetOpacity) > 0.001) {
+          tm.lineMat.opacity   += (targetOpacity - tm.lineMat.opacity)   * 0.05
+          tm.pointsMat.opacity += (targetOpacity - tm.pointsMat.opacity) * 0.05
+        }
+        const targetNowOp = tm.treeWeek === currentWeek ? 0.5 : 0
+        tm.nowRingMat.opacity += (targetNowOp - tm.nowRingMat.opacity) * 0.05
 
         // Cylindrical billboard: rotate Y so tree always faces camera
         const dx = camera.position.x - tm.wx

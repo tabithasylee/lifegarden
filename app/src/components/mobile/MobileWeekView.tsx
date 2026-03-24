@@ -7,7 +7,7 @@ const BIOME_COLOR: Record<string, string> = {
 }
 
 export default function MobileWeekView() {
-  const { trees, projects, biomes, currentWeek, viewWeek, setViewWeek, setActiveTask } = useGardenStore()
+  const { trees, projects, biomes, currentWeek, viewWeek, setViewWeek, setActiveTask, updateTask } = useGardenStore()
 
   const weekTrees = trees.filter(t => t.week === viewWeek)
 
@@ -138,6 +138,10 @@ export default function MobileWeekView() {
                           width: 12, height: 12,
                           border: isDone ? 'none' : '0.5px solid rgba(251,230,160,0.3)',
                           background: isDone ? '#44CF6C' : 'transparent',
+                        }}
+                        onClick={e => {
+                          e.stopPropagation()
+                          updateTask(tree.id, task.id, { status: isDone ? 'scheduled' : 'complete' })
                         }}
                       />
                       <div className="flex-1 min-w-0">

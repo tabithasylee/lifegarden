@@ -63,15 +63,18 @@ function buildLateral(
   }
 }
 
-export function buildTreeGeometry(id: string, scale: number): TreeGeometry {
+// density: 0–1, scales step count and lateral depth within species range
+export function buildTreeGeometry(id: string, scale: number, density = 0.5): TreeGeometry {
   const rng = createRng(idToSeed(id))
   const sp = SPECIES[SPECIES_NAMES[Math.floor(rng() * SPECIES_NAMES.length)]]
 
-  const steps    = Math.floor(sp.steps[0]    + rng() * (sp.steps[1]    - sp.steps[0]))
+  const stepsRange = sp.steps[1] - sp.steps[0]
+  const steps    = Math.round(sp.steps[0] + density * stepsRange + rng() * stepsRange * 0.25)
   const segLen   = (sp.segLen[0]   + rng() * (sp.segLen[1]   - sp.segLen[0])) * scale
   const latAngle = sp.latAngle[0]  + rng() * (sp.latAngle[1]  - sp.latAngle[0])
   const latScale = sp.latScale[0]  + rng() * (sp.latScale[1]  - sp.latScale[0])
-  const latDepth = Math.floor(sp.latDepth[0] + rng() * (sp.latDepth[1] - sp.latDepth[0]))
+  const depthRange = sp.latDepth[1] - sp.latDepth[0]
+  const latDepth = Math.round(sp.latDepth[0] + density * depthRange)
   const wander   = rng() * sp.wander
 
   const verts: number[] = []
