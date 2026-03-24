@@ -1,4 +1,4 @@
-import { motion } from 'framer-motion'
+import { motion, AnimatePresence } from 'framer-motion'
 import { useGardenStore } from '@/store/garden'
 import { weekLabel, weekDateRange, offsetWeek } from '@/lib/weeks'
 import AnimatedCheckbox from '@/components/shared/AnimatedCheckbox'
@@ -10,16 +10,20 @@ export default function TasksView() {
   const {
     biomes, projects, trees, currentWeek, viewWeek, setViewWeek,
     setActiveView,
-    setActiveTask, toggleTaskStatus,
+    setActiveTask, toggleTaskStatus, moveUncompletedToBacklog,
   } = useGardenStore()
 
   const wLabel    = weekLabel(viewWeek)
   const dateRange = weekDateRange(viewWeek)
 
   // Collect all trees for the viewed week, grouped by biome
-  const currentTrees = trees.filter(t => t.week === viewWeek)
-  const totalTasks   = currentTrees.flatMap(t => t.tasks).length
-  const doneTasks    = currentTrees.flatMap(t => t.tasks).filter(t => t.status === 'complete').length
+  const currentTrees  = trees.filter(t => t.week === viewWeek)
+  const totalTasks    = currentTrees.flatMap(t => t.tasks).length
+  const doneTasks     = currentTrees.flatMap(t => t.tasks).filter(t => t.status === 'complete').length
+  const isPastWeek    = viewWeek !== currentWeek
+  const treesWithIncomplete = isPastWeek
+    ? currentTrees.filter(t => t.tasks.some(task => task.status !== 'complete'))
+    : []
 
   return (
     <div className="absolute inset-0 z-30 flex items-center justify-center pointer-events-none">
@@ -216,6 +220,33 @@ export default function TasksView() {
             </p>
           )}
         </div>
+
+        {/* Move incomplete to backlog — past weeks only */}
+        <AnimatePresence>
+          {treesWithIncomplete.length > 0 && (
+            <motion.div
+              key="move-to-backlog"
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+              exit={{ opacity: 0, height: 0 }}
+              transition={{ duration: 0.15 }}
+              className="overflow-hidden"
+            >
+              <div className="flex justify-end px-5 py-2">
+                <button
+                  onClick={() => treesWithIncomplete.forEach(t => moveUncompletedToBacklog(t.id))}
+                  className="font-mono text-[8px] tracking-[0.08em] px-2 py-1 transition-colors hover:opacity-80"
+                  style={{
+                    border: '0.5px solid rgba(226,181,64,0.3)',
+                    color:  'rgba(226,181,64,0.7)',
+                  }}
+                >
+                  ↩ move incomplete to backlog
+                </button>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         {/* Footer */}
         <div style={{ height: '0.5px', background: 'rgba(232,213,160,0.08)' }} />

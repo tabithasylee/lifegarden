@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32">
+  <rect width="32" height="32" fill="#112f2c"/>
+  <g transform="translate(16,16) scale(0.72)">
+    <!-- stem -->
+    <line x1="0" y1="14" x2="0" y2="-2" stroke="#fbe6a0" stroke-width="0.9"/>
+    <!-- left leaf -->
+    <line x1="0" y1="4"  x2="-7" y2="-3" stroke="#fbe6a0" stroke-width="0.65"/>
+    <!-- right leaf -->
+    <line x1="0" y1="0"  x2="7"  y2="-7" stroke="#fbe6a0" stroke-width="0.65"/>
+    <!-- ground ring -->
+    <ellipse cx="0" cy="14" rx="5" ry="1.5" stroke="#e2b540" stroke-width="0.5" fill="none"/>
+    <!-- left leaf ellipse -->
+    <ellipse cx="-7" cy="-4" rx="3.2" ry="1.9" stroke="#fbe6a0" stroke-width="0.45" fill="none"/>
+    <!-- right leaf ellipse -->
+    <ellipse cx="7"  cy="-8" rx="3.2" ry="1.9" stroke="#fbe6a0" stroke-width="0.45" fill="none"/>
+  </g>
+</svg>

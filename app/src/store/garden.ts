@@ -586,8 +586,6 @@ export const useGardenStore = create<GardenStore>()(
         projects:     state.projects,
         trees:        state.trees,
         backlog:      state.backlog,
-        currentWeek:  state.currentWeek,
-        viewWeek:     state.viewWeek,
         biomeLayouts: state.biomeLayouts,
         treeLayouts:  state.treeLayouts,
       }),
