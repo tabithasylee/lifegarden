@@ -221,19 +221,21 @@ export default function TasksView() {
           )}
         </div>
 
-        {/* Move incomplete to backlog — past weeks only */}
-        <AnimatePresence>
-          {treesWithIncomplete.length > 0 && (
-            <motion.div
-              key="move-to-backlog"
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: 'auto' }}
-              exit={{ opacity: 0, height: 0 }}
-              transition={{ duration: 0.15 }}
-              className="overflow-hidden"
-            >
-              <div className="flex justify-end px-5 py-2">
-                <button
+        {/* Footer */}
+        <div style={{ height: '0.5px', background: 'rgba(232,213,160,0.08)' }} />
+        <div className="pl-5 pr-5 py-3 flex items-center justify-between">
+          <span className="font-mono text-[7.5px] tracking-[0.1em] uppercase" style={{ color: 'rgba(123,158,139,0.5)' }}>
+            {currentTrees.length} tree{currentTrees.length !== 1 ? 's' : ''} this week
+          </span>
+          <div className="flex items-center gap-3">
+            <AnimatePresence>
+              {treesWithIncomplete.length > 0 && (
+                <motion.button
+                  key="move-to-backlog"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: 0.15 }}
                   onClick={() => treesWithIncomplete.forEach(t => moveUncompletedToBacklog(t.id))}
                   className="font-mono text-[8px] tracking-[0.08em] px-2 py-1 transition-colors hover:opacity-80"
                   style={{
@@ -242,25 +244,17 @@ export default function TasksView() {
                   }}
                 >
                   ↩ move incomplete to backlog
-                </button>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-
-        {/* Footer */}
-        <div style={{ height: '0.5px', background: 'rgba(232,213,160,0.08)' }} />
-        <div className="pl-5 pr-5 py-3 flex items-center justify-between">
-          <span className="font-mono text-[7.5px] tracking-[0.1em] uppercase" style={{ color: 'rgba(123,158,139,0.5)' }}>
-            {currentTrees.length} tree{currentTrees.length !== 1 ? 's' : ''} this week
-          </span>
-          <button
-            onClick={() => setActiveView('backlog')}
-            className="font-mono text-[8px] tracking-[0.08em] transition-colors hover:opacity-80"
-            style={{ color: 'rgba(251,230,160,0.35)' }}
-          >
-            View backlog →
-          </button>
+                </motion.button>
+              )}
+            </AnimatePresence>
+            <button
+              onClick={() => setActiveView('backlog')}
+              className="font-mono text-[8px] tracking-[0.08em] transition-colors hover:opacity-80"
+              style={{ color: 'rgba(251,230,160,0.35)' }}
+            >
+              View backlog →
+            </button>
+          </div>
         </div>
       </motion.div>
       </GlitchPanel>
